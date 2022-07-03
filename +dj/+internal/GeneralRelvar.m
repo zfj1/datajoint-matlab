@@ -712,11 +712,42 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                         aliasCount);
                     header.stripAliases;
                 end
+                
+                isPer = cellfun(@(x) isa(x, 'char') && contains(x, 'PER'), self.restrictions);
+                if any(isPer)
+                    assert(nnz(isPer) == 1, 'only one PER statement is allowed for a single relation');
+                    [~,~,per] = makeLimitClause(header.names{:}, self.restrictions{isPer});
+                    perInd = find(isPer);
+                else
+                    perInd = length(self.restrictions) + 1;
+                end
+                    
+             
                 % add WHERE clause
-                sql = sprintf('%s%s', sql);
-                whereClause = makeWhereClause(header, self.restrictions);
+%                 sql = sprintf('%s%s', sql);
+                whereClause = makeWhereClause(header, self.restrictions(1:perInd - 1));
                 if ~isempty(whereClause)
                     sql = sprintf('%s WHERE %s', sql, whereClause);
+                end
+                
+                if any(isPer)
+                    %resolve per clause
+                    
+                    if ~isempty(per.orderby)
+                        orderby = sprintf('ORDER BY %s', per.orderby);
+                    else
+                        orderby = '';
+                    end
+                    sql = sprintf('SELECT %s FROM (SELECT %s,ROW_NUMBER() OVER (PARTITION BY %s %s) AS rnk FROM %s) AS `$a%x` WHERE (rnk <= %s)',...
+                        header.sql, header.sql, per.selector, orderby, sql, aliasCount, per.limit);
+                    
+                    whereClause = makeWhereClause(header, self.restrictions(perInd + 1:end));
+                    
+                    if ~isempty(whereClause)
+                        sql = sprintf('%s AND %s', sql, whereClause);
+                    end
+                    sql = sprintf('(%s) AS `$a%x`', sql, aliasCount + 1);
+                    aliasCount = aliasCount + 2;
                 end
             end
             
@@ -896,23 +927,61 @@ function cond = struct2cond(keys, header)
 end
 
 
-function [limit, args] = makeLimitClause(varargin)
+function [limit, args, per, outer] = makeLimitClause(varargin)
     % makes the SQL limit clause from fetch() input arguments.
     % If the last one or two inputs are numeric, a LIMIT clause is
     % created.
     args = varargin;
     limit = '';
-    if nargin
-        lastArg = varargin{end};
-        if ischar(lastArg) && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || ...
-                strncmp(varargin{end}, 'LIMIT ', 6))
-            limit = [' ' varargin{end}];
-            args = args(1:end-1);
-        elseif isnumeric(lastArg)
-            limit = sprintf(' LIMIT %d', lastArg);
-            args = args(1:end-1);
+    per = [];
+    outer = {};
+    
+    if ~nargin
+        return
+    end
+    
+    lastArg = args{end};
+    if isstring(lastArg)
+        lastArg = char(lastArg);
+    end
+    
+    if strcmp(lastArg, '*')
+        return
+    end
+    
+    if ischar(lastArg) && ~contains(lastArg,'PER') && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || ...
+            strncmp(lastArg, 'LIMIT ', 6))
+        limit = [' ' lastArg];
+        args = args(1:end-1);
+        lastArg = args{end};
+    elseif isnumeric(lastArg)
+        limit = sprintf(' LIMIT %d', lastArg);
+        args = args(1:end-1);
+        lastArg = args{end};
+    end
+    
+    if ischar(lastArg) && contains(lastArg, 'PER')
+        per = regexp( lastArg, '^LIMIT\s(?<limit>\d+)\sPER\s`?(?<selector>\w+)`?\s*(ORDER\sBY)?(?<orderby>(([\s*\w*\s*,?])*))', 'names');
+        if ~isempty(per.orderby)
+            %TODO: should handle case where desc/asc is absent
+            tokens = regexp(per.orderby, '([a-z0-9_]+)','tokens');
+            order = regexp(per.orderby, '((DESC)?(ASC)?)','tokens');
+            per.orderby = join(cellfun(@(x, y) sprintf('`%s` %s', x, y), horzcat(tokens{:}), horzcat(order{:}), 'uniformOutput', false), ',');
+            per.orderby = per.orderby{:};
+        end
+        
+        args = args(1:end-1);
+        if ~isempty(args)
+            outer = args;
+            if ~ismember(per.selector, args)
+                args{end + 1} = per.selector;
+            end
+            if ~isempty(per.orderby)
+                args = union(args, tokens{1});
+            end
         end
     end
+    
 end
 
 
