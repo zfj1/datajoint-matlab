@@ -390,12 +390,17 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     placeholder = 'NULL';
                     value = [];
                 elseif header.attributes(attr_idx).isString
-                    assert(dj.lib.isString(value), ...
-                        'DataJoint:DataType:Mismatch', ...
-                        'The field `%s` must be a character string', ...
-                        header.attributes(attr_idx).name);
-                    placeholder = '"{S}"';
-                    value = char(value);
+                    if isscalar(value) && isnan(value)
+                        placeholder = 'NULL';
+                        value = [];
+                    else
+                        assert(dj.lib.isString(value), ...
+                            'DataJoint:DataType:Mismatch', ...
+                            'The field `%s` must be a character string', ...
+                            header.attributes(attr_idx).name);                        
+                            placeholder = '"{S}"';
+                            value = char(value);
+                    end                    
                 elseif header.attributes(attr_idx).isUuid
                     value = strrep(value, '-', '');
                     hexstring = value';
