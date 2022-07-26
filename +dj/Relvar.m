@@ -125,17 +125,27 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                 @(x) strcmp(x.from, rels(ix).fullTableName), ...
                                 self.schema.conn.foreignKeys, 'uni', true);
                             fks = self.schema.conn.foreignKeys(fk_index);
-                            if ~all([fks.aliased])
+                            
+                            % Determine which foreign keys have been renamed
+                            fks_index_i = arrayfun(@(x) strcmp(x.ref, rels(i).fullTableName), fks);
+
+                            if ~any([fks.aliased] & fks_index_i)
                                 % If matched foreign keys are not aliased, no renaming
                                 % necessary. Restrict table based on normal projection.
                                 rels(ix).restrict(proj(rels(i)));
                             else
-                                % Determine which foreign keys have been renamed
-                                fks_ref_attrs_flattened = arrayfun(@(x) x.ref_attrs{:}, fks, 'UniformOutput', false);
-                                fks_attrs_flattened = arrayfun(@(x) x.attrs{:}, fks, 'UniformOutput', false);
+                                
+%                                 fks_ref_attrs_flattened = arrayfun(@(x) x.ref_attrs{fks_index_i}, fks, 'UniformOutput', false);
+                                fks_ref_attrs_flattened = {fks(fks_index_i).ref_attrs};
+                                fks_ref_attrs_flattened = vertcat(fks_ref_attrs_flattened{:});
+                                
+%                                 fks_attrs_flattened = arrayfun(@(x) x.attrs{fks_index_i}, fks, 'UniformOutput', false);
+                                fks_attrs_flattened = {fks(fks_index_i).attrs};
+                                fks_attrs_flattened = vertcat(fks_attrs_flattened{:});
+                                
                                 % Build OR string query using original and renamed attributes
                                 or_string_query = strjoin(cellfun(...
-                                    @(attr,ref_attr) sprintf('%s = "%s"', attr, rels(i).fetch1(ref_attr)), ...
+                                    @(attr,ref_attr) sprintf('%s = "%s"', attr, num2str(rels(i).fetch1(ref_attr))), ...
                                     fks_attrs_flattened, fks_ref_attrs_flattened, ...
                                     'uni', 0), ' OR ');
                                 % Restrict table based on projection with rename arguments on
@@ -390,6 +400,9 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     placeholder = 'NULL';
                     value = [];
                 elseif header.attributes(attr_idx).isString
+                    if isa(value, 'string')
+                        value = char(value);
+                    end
                     if isscalar(value) && isnan(value)
                         placeholder = 'NULL';
                         value = [];
