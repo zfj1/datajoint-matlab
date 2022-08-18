@@ -9,6 +9,9 @@ function setup(varargin)
     if ~isempty(INVOKED) && ~force
         return
     end
+    if isdeployed
+        return
+    end
     % check MATLAB
     if verLessThan('matlab', '9.1')
         error('DataJoint:System:UnsupportedMatlabVersion', ...
