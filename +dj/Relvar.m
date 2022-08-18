@@ -81,7 +81,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 end
             end
             
-            function text = or_result(rel, attr, ref_attr)
+            function text = or_result(ref, rel, attr, ref_attr)
                 %res = rel.fetch(ref_attrs{:}); %e.g., ref_attrs{:} == 'file_name', 'source_id'
                 %arrayfun (@(x) join(sprintf('`%s`=%s', attrs{:}, res(ref_attrs{:})), ' AND '), res) %roughly, need to add parens
                 % join (..., ' OR ')
@@ -92,7 +92,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     return;
                 end
                 
-                text = cell2mat(join(arrayfun(@(z) sprintf('(%s)', cell2mat(join(cellfun(@(x,y) sprintf('`%s`="%s"', x, num2str(z.(y))), attr, ref_attr,'uni',0), ' AND '))), res, 'uni', 0),' OR '));
+                text = cell2mat(join(arrayfun(@(z) sprintf('(%s)', cell2mat(join(cellfun(@(x,y) sprintf('%s.`%s`="%s"', ref.fullTableName, x, num2str(z.(y))), attr, ref_attr,'uni',0), ' AND '))), res, 'uni', 0),' OR '));
                 
             end
             
@@ -165,7 +165,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                 % TODO: this part is buggy... fails on fetch1
                                 % Build OR string query using original and renamed attributes
                                 or_string_query = strjoin(arrayfun(...
-                                    @(x) or_result(rels(i), fks_attrs_flattened(x,:),fks_ref_attrs_flattened(x,:)), ...
+                                    @(x) or_result(rels(ix), rels(i), fks_attrs_flattened(x,:),fks_ref_attrs_flattened(x,:)), ...
                                     1:size(fks_attrs_flattened, 1), ...
                                     'uni', 0), ' OR ');
                                 % Restrict table based on projection with rename arguments on
