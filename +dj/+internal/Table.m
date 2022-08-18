@@ -639,6 +639,7 @@ classdef Table < handle
                 temp.schema = self.schema;
                 sql = dj.internal.Declare.declare(temp,hiddenDef);
                 sql = strrep(sql,'`$hidden`',['`$',self.plainTableName,'`']);
+                sql = strrep(sql,'ON DELETE RESTRICT','ON DELETE CASCADE');
                 self.schema.conn.query(sql);
 
             end
