@@ -81,6 +81,20 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 end
             end
             
+            function text = or_result(rel, attr, ref_attr)
+                res = rel.fetchn(ref_attr);
+                if isempty(res)
+                    text = '';
+                    return;
+                end
+                if ~iscell(res)
+                    res = cellfun(@num2str,num2cell(res),'UniformOutput',false);
+                end
+                text = sprintf('%s =%%s OR ', attr);
+                text = sprintf(text, res{:});
+                text = text(1:end-4);
+            end
+            
             if nargin<2
                 maintainTransaction = false;
             end
@@ -116,6 +130,10 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                                                % then restrict by self
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
+                    if ~count(rels(i))
+                        %no restriction to be done
+                        continue
+                    end
                     for ix = cellfun(@(child) find(strcmp( ...
                             self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
@@ -143,9 +161,10 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                 fks_attrs_flattened = {fks(fks_index_i).attrs};
                                 fks_attrs_flattened = vertcat(fks_attrs_flattened{:});
                                 
+                                % TODO: this part is buggy... fails on fetch1
                                 % Build OR string query using original and renamed attributes
                                 or_string_query = strjoin(cellfun(...
-                                    @(attr,ref_attr) sprintf('%s = "%s"', attr, num2str(rels(i).fetch1(ref_attr))), ...
+                                    @( attr,ref_attr) or_result(rels(i), attr, ref_attr), ...
                                     fks_attrs_flattened, fks_ref_attrs_flattened, ...
                                     'uni', 0), ' OR ');
                                 % Restrict table based on projection with rename arguments on
