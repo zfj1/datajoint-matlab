@@ -781,6 +781,7 @@ function clause = makeWhereClause(header, restrictions)
 
     for arg = restrictions
         cond = arg{1};
+        
         switch true
             case isa(cond, 'dj.internal.GeneralRelvar') && strcmp(cond.operator, 'union')
                 % union
@@ -800,6 +801,12 @@ function clause = makeWhereClause(header, restrictions)
                 continue
                 
             case dj.lib.isString(cond) && ~strcmpi(cond, 'NOT')
+                 if contains(cond, header.names)
+                    cols = cellfun(@(x) sprintf('`%s`', x), header.names,'uni',0);
+                    cond = replace(cond, header.names, cols);
+                    cond = replace(cond, '``','`');
+                end
+
                 % SQL condition
                 clause = sprintf('%s AND %s(%s)', clause, not, cond);
                 
