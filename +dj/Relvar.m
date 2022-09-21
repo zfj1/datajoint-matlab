@@ -210,21 +210,21 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         partRels = {};
                         for rel = fliplr(rels)
                             fprintf('Deleting from %s\n', rel.className)
-
+                            
+                            relc = feval(rel.className);
                             if any(strcmp(superclasses(rel.className), 'dj.Part'))
-                                c = feval(rel.className);
-                                if strcmp(c.master.className,self.className)
+                                if strcmp(relc.master.className,self.className)
                                     % we want to delete this part with the master
-                                    parts = cat(1,parts,{c.proj()});
+                                    parts = cat(1,parts,{relc.proj()});
                                     partRels = cat(1,partRels,{rel});
-                                elseif ~strcmp(c.master.className,{rels(:).className})
+                                elseif ~strcmp(relc.master.className,{rels(:).className})
                                     %the master does not derive from the
                                     %caller, but a part must be deleted
                                     
                                     %must delete the master to maintain
                                     %integrity. Deleting the master will
                                     %delete this part
-                                    del(c.master & rel, true);
+                                    del(relc.master & rel, true);
                                     
                                 else
                                     %the master derives from the caller, so
@@ -255,18 +255,17 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                     );
                                 all_fks = struct('schema',{},...
                                     'table',{},'column',{},'master_column',{});
-                                c = feval(rel.className);
-                                for pk=c.header.primaryKey
+                                for pk=relc.header.primaryKey
                                     all_fks = cat(1,all_fks,fk_recurser(...
                                         fks,...
-                                        c.plainTableName,...
-                                        c.schema.dbname,...
+                                        relc.plainTableName,...
+                                        relc.schema.dbname,...
                                         pk,pk...
                                         ));
                                 end
     
                                 % Build the query string and drop pesky foreign keys
-                                sql = c.sql;
+                                sql = relc.sql;
                                 del_str = sql;
                                 for n=1:numel(parts)
                                     on_clause = '';
