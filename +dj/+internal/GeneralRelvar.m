@@ -801,11 +801,17 @@ function clause = makeWhereClause(header, restrictions)
                 continue
                 
             case dj.lib.isString(cond) && ~strcmpi(cond, 'NOT')
-                 if contains(cond, header.names)
+%                  if contains(cond, header.names)
+%                     cols = cellfun(@(x) sprintf('`%s`', x), header.names,'uni',0);
+%                     cond = replace(cond, header.names, cols);
+%                     cond = replace(cond, '``','`');
+%                  end
+                if any(strcmp(cond, header.names))
+                    error('Fix me!!!');
                     cols = cellfun(@(x) sprintf('`%s`', x), header.names,'uni',0);
                     cond = replace(cond, header.names, cols);
                     cond = replace(cond, '``','`');
-                end
+                 end
 
                 % SQL condition
                 clause = sprintf('%s AND %s(%s)', clause, not, cond);

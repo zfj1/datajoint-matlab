@@ -81,19 +81,27 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 end
             end
             
-            function text = or_result(ref, rel, attr, ref_attr)
-                %res = rel.fetch(ref_attrs{:}); %e.g., ref_attrs{:} == 'file_name', 'source_id'
-                %arrayfun (@(x) join(sprintf('`%s`=%s', attrs{:}, res(ref_attrs{:})), ' AND '), res) %roughly, need to add parens
-                % join (..., ' OR ')
-                
-                res = rel.fetch(ref_attr{:});
-                if isempty(res)
-                    text = '';
-                    return;
+%             function text = or_result(ref, rel, attr, ref_attr)
+%                 %res = rel.fetch(ref_attrs{:}); %e.g., ref_attrs{:} == 'file_name', 'source_id'
+%                 %arrayfun (@(x) join(sprintf('`%s`=%s', attrs{:}, res(ref_attrs{:})), ' AND '), res) %roughly, need to add parens
+%                 % join (..., ' OR ')
+%                 
+%                 res = rel.fetch(ref_attr{:});
+%                 if isempty(res)
+%                     % in this case we want an empty relation?
+%                     text = '';
+%                     return;
+%                 end
+%                 
+%                 text = cell2mat(join(arrayfun(@(z) sprintf('(%s)', cell2mat(join(cellfun(@(x,y) sprintf('%s.`%s`="%s"', ref.fullTableName, x, num2str(z.(y))), attr, ref_attr,'uni',0), ' AND '))), res, 'uni', 0),' OR '));
+%                 
+%             end
+            function text = make_projection(ref_attr, attr)
+                if strcmp(ref_attr, attr)
+                    text = ref_attr;
+                else
+                    text = sprintf('%s->%s',ref_attr, attr);
                 end
-                
-                text = cell2mat(join(arrayfun(@(z) sprintf('(%s)', cell2mat(join(cellfun(@(x,y) sprintf('%s.`%s`="%s"', ref.fullTableName, x, num2str(z.(y))), attr, ref_attr,'uni',0), ' AND '))), res, 'uni', 0),' OR '));
-                
             end
             
             if nargin<2
@@ -131,10 +139,6 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                                                % then restrict by self
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
-                    if ~count(rels(i))
-                        %no restriction to be done
-                        continue
-                    end
                     for ix = cellfun(@(child) find(strcmp( ...
                             self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
@@ -154,25 +158,25 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                 rels(ix).restrict(proj(rels(i)));
                             else
                                 
-%                                 fks_ref_attrs_flattened = arrayfun(@(x) x.ref_attrs{fks_index_i}, fks, 'UniformOutput', false);
                                 fks_ref_attrs_flattened = {fks(fks_index_i).ref_attrs};
                                 fks_ref_attrs_flattened = vertcat(fks_ref_attrs_flattened{:});
                                 
-%                                 fks_attrs_flattened = arrayfun(@(x) x.attrs{fks_index_i}, fks, 'UniformOutput', false);
                                 fks_attrs_flattened = {fks(fks_index_i).attrs};
                                 fks_attrs_flattened = vertcat(fks_attrs_flattened{:});
                                 
-                                % TODO: this part is buggy... fails on fetch1
-                                % Build OR string query using original and renamed attributes
-                                or_string_query = strjoin(arrayfun(...
-                                    @(x) or_result(rels(ix), rels(i), fks_attrs_flattened(x,:),fks_ref_attrs_flattened(x,:)), ...
-                                    1:size(fks_attrs_flattened, 1), ...
-                                    'uni', 0), ' OR ');
+%                                 % Build OR string query using original and renamed attributes
+%                                 or_string_query = strjoin(arrayfun(...
+%                                     @(x) or_result(rels(ix), rels(i), fks_attrs_flattened(x,:),fks_ref_attrs_flattened(x,:)), ...
+%                                     1:size(fks_attrs_flattened, 1), ...
+%                                     'uni', 0), ' OR ');
+                                
+                                proj_string = cellfun(@(x,y) make_projection(x,y),fks_ref_attrs_flattened, fks_attrs_flattened, 'uni', 0);
+                                
                                 % Restrict table based on projection with rename arguments on
                                 % foreign keys.
-                                rels(ix).restrict(or_string_query);
+                                rels(ix).restrict(proj(rels(i), proj_string{:}));
                             end
-                        else
+                        else         
                             rels(ix).restrict(rels(i).restrictions{:});
                         end
                     end
