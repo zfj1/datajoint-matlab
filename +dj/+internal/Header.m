@@ -134,6 +134,12 @@ classdef Header < matlab.mixin.Copyable
             attrs = rmfield(attrs, 'Extra');
             self.attributes = dj.struct.fromFields(attrs);
         end
+
+        function self = initFromAttributes(attributes, name, comment)
+            self = dj.internal.Header;
+            self.attributes = attributes;
+            self.info = struct('name',name,'comment',comment);
+        end
     end
     
     
